@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Building Blocks</title>
+<style>
+  body { margin: 0; overflow: hidden; }
+  canvas { display: block; }
+  #ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    font-family: sans-serif;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  <p>Controls: WASD = Move, Mouse = Look, Left Click = Shoot, Right Click = Place Block, Number 1-3 = Change Gun</p>
+  <p>Current Gun: <span id="gunName">Pistol</span></p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.162.0/examples/js/controls/PointerLockControls.js"></script>
+<script>
+
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Controls
+let controls = new THREE.PointerLockControls(camera, renderer.domElement);
+document.body.addEventListener('click', () => controls.lock());
+
+// Ground
+let groundGeo = new THREE.BoxGeometry(50, 1, 50);
+let groundMat = new THREE.MeshPhongMaterial({color:0x228B22});
+let ground = new THREE.Mesh(groundGeo, groundMat);
+ground.position.y = -0.5;
+scene.add(ground);
+
+// Light
+let light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10,20,10);
+scene.add(light);
+
+// Voxel storage
+let voxels = [];
+let voxelSize = 1;
+
+// Gun system
+let guns = [
+  {name:"Pistol", color:0x555555, damage:10, speed:0.5},
+  {name:"Rifle", color:0xff0000, damage:20, speed:0.8},
+  {name:"Shotgun", color:0xffff00, damage:30, speed:0.3}
+];
+let currentGun = 0;
+
+// Shooting bullets
+let bullets = [];
+function shoot() {
+  let bulletGeo = new THREE.SphereGeometry(0.1,8,8);
+  let bulletMat = new THREE.MeshBasicMaterial({color: guns[currentGun].color});
+  let bullet = new THREE.Mesh(bulletGeo, bulletMat);
+  bullet.position.copy(camera.position);
+  bullet.velocity = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(guns[currentGun].speed*10);
+  bullets.push(bullet);
+  scene.add(bullet);
+}
+
+// Place voxel
+function placeVoxel() {
+  let voxelGeo = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
+  let voxelMat = new THREE.MeshPhongMaterial({color: Math.random()*0xffffff});
+  let voxel = new THREE.Mesh(voxelGeo, voxelMat);
+  let dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  voxel.position.copy(camera.position.clone().add(dir.multiplyScalar(3)));
+  scene.add(voxel);
+  voxels.push(voxel);
+}
+
+// Input
+let keys = {};
+document.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Mouse buttons
+document.addEventListener('mousedown', e => {
+  if(e.button===0) shoot();
+  if(e.button===2) placeVoxel();
+});
+
+// Change guns
+document.addEventListener('keydown', e => {
+  if(e.key==='1') currentGun=0;
+  if(e.key==='2') currentGun=1;
+  if(e.key==='3') currentGun=2;
+  document.getElementById('gunName').innerText = guns[currentGun].name;
+});
+
+// Animation loop
+let clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  let delta = clock.getDelta();
+
+  // Movement
+  let speed = 5 * delta;
+  if(keys['w']) controls.moveForward(speed);
+  if(keys['s']) controls.moveForward(-speed);
+  if(keys['a']) controls.moveRight(-speed);
+  if(keys['d']) controls.moveRight(speed);
+
+  // Update bullets
+  bullets.forEach((b,i)=>{
+    b.position.add(b.velocity.clone().multiplyScalar(delta*10));
+    // Remove far bullets
+    if(b.position.length()>100) {
+      scene.remove(b);
+      bullets.splice(i,1);
+    }
+  });
+
+  renderer.render(scene,camera);
+}
+animate();
+
+</script>
+</body>
+</html>
